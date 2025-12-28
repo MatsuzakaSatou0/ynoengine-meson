@@ -580,39 +580,8 @@ set_property(SOURCE src/version.cpp PROPERTY COMPILE_DEFINITIONS
 	EP_VERSION_GIT="${PLAYER_VERSION_GIT}"
 )
 
-# Platform setup
-if(NINTENDO_3DS)
-	set(PLAYER_TARGET_PLATFORM "3ds" CACHE STRING "Platform to compile for.")
-elseif(NINTENDO_SWITCH)
-	set(PLAYER_TARGET_PLATFORM "switch" CACHE STRING "Platform to compile for.")
-elseif(VITA)
-	set(PLAYER_TARGET_PLATFORM "psvita" CACHE STRING "Platform to compile for.")
-elseif(NINTENDO_WII)
-	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for. Options: SDL2 SDL1")
-	set_property(CACHE PLAYER_TARGET_PLATFORM PROPERTY STRINGS SDL2 SDL1)
-elseif(NINTENDO_WIIU)
-	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for.")
-elseif(AMIGA)
-	set(PLAYER_TARGET_PLATFORM "SDL1" CACHE STRING "Platform to compile for.")
-else()
-	set(PLAYER_TARGET_PLATFORM "SDL2" CACHE STRING "Platform to compile for. Options: SDL3 SDL2 SDL1 libretro")
-	set_property(CACHE PLAYER_TARGET_PLATFORM PROPERTY STRINGS SDL3 SDL2 SDL1 libretro)
-endif()
 set(PLAYER_BUILD_EXECUTABLE ON)
 set(PLAYER_TEST_LIBRARIES ${PROJECT_NAME})
-
-if(ANDROID AND PLAYER_GRADLE_BUILD)
-	# Build invoked by Gradle
-	# Ugly: Gradle has no way to branch based on the ABI
-	# Inject correct search path based on PLAYER_ANDROID_TOOLCHAIN_PATH
-	foreach(f ${PLAYER_ANDROID_TOOLCHAIN_PATH})
-		list(APPEND CMAKE_FIND_ROOT_PATH "${f}/${CMAKE_ANDROID_ARCH_ABI}-toolchain")
-	endforeach(f)
-endif()
-
-if(APPLE AND NOT IOS AND NOT CMAKE_SYSTEM_NAME STREQUAL "tvOS")
-	set(MACOS TRUE)
-endif()
 
 if(PLAYER_TARGET_PLATFORM STREQUAL "SDL3")
 	target_sources(${PROJECT_NAME} PRIVATE
@@ -643,109 +612,6 @@ elseif(PLAYER_TARGET_PLATFORM STREQUAL "SDL2")
 	if(TARGET SDL2::SDL2main)
 		target_link_libraries(${PROJECT_NAME} SDL2::SDL2main)
 	endif()
-
-	if(ANDROID)
-		set(PLAYER_BUILD_EXECUTABLE OFF)
-	elseif(NINTENDO_WII)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_NINTENDO)
-		target_sources(${PROJECT_NAME} PRIVATE
-			src/platform/wii/clock.h
-			src/platform/wii/input_buttons.cpp)
-	elseif(NINTENDO_WIIU)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_NINTENDO)
-		target_sources(${PROJECT_NAME} PRIVATE
-			src/platform/wiiu/main.h
-			src/platform/wiiu/input_buttons.cpp)
-	endif()
-
-	if(WIN32)
-		target_link_libraries(${PROJECT_NAME} "Dwmapi")
-	endif()
-elseif(PLAYER_TARGET_PLATFORM STREQUAL "SDL1")
-	if(NINTENDO_WII)
-		find_package(SDL REQUIRED)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_NINTENDO)
-		target_include_directories(${PROJECT_NAME} PUBLIC ${SDL_INCLUDE_DIR})
-		target_sources(${PROJECT_NAME} PRIVATE
-			src/platform/wii/clock.h
-			src/platform/wii/input_buttons.cpp)
-	else()
-		player_find_package(NAME SDL1 TARGET SDL::SDLmain REQUIRED)
-	endif()
-
-	target_sources(${PROJECT_NAME} PRIVATE
-		src/platform/sdl/axis.h
-		src/platform/sdl/sdl_ui.cpp
-		src/platform/sdl/sdl_ui.h)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC
-		USE_SDL=1
-		EASYRPG_CONFIG_NAME="config_sdl1.ini"
-	)
-elseif(PLAYER_TARGET_PLATFORM STREQUAL "libretro")
-	target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_UI=LibretroUi USE_LIBRETRO=1)
-	set(PLAYER_BUILD_EXECUTABLE OFF)
-	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/builds/libretro)
-	target_link_libraries(${PROJECT_NAME} retro_common)
-elseif(PLAYER_TARGET_PLATFORM STREQUAL "3ds")
-	target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_UI=CtrUi PLAYER_NINTENDO)
-	target_compile_options(${PROJECT_NAME} PUBLIC -Wno-psabi) # Remove abi warning after devkitarm ships newer gcc
-	# generate gfx assets
-	enable_language(ASM)
-	ctr_add_graphics_target(keyboard IMAGE
-		INPUTS ${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/keyboard.png
-		OPTIONS -f rgba)
-	ctr_add_graphics_target(battery ATLAS
-		INPUTS
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/empty.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/1bar.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/2bars.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/3bars.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/4bars.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/full.png
-			${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/battery/adapter.png
-		OPTIONS -f rgba)
-	dkp_add_embedded_binary_library(3ds-assets keyboard battery)
-	target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-	target_sources(${PROJECT_NAME} INTERFACE
-		$<TARGET_OBJECTS:3ds-assets> PRIVATE
-		src/platform/3ds/audio.cpp
-		src/platform/3ds/audio.h
-		src/platform/3ds/clock.h
-		src/platform/3ds/input_buttons.cpp
-		src/platform/3ds/ui.cpp
-		src/platform/3ds/ui.h)
-	target_link_libraries(${PROJECT_NAME} 3ds-assets)
-elseif(PLAYER_TARGET_PLATFORM STREQUAL "psvita")
-	include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_UI=Psp2Ui)
-	target_compile_options(${PROJECT_NAME} PUBLIC -Wno-psabi) # Remove abi warning after vitasdk ships newer gcc
-	target_sources(${PROJECT_NAME} PRIVATE
-		src/platform/psvita/audio.cpp
-		src/platform/psvita/audio.h
-		src/platform/psvita/clock.h
-		src/platform/psvita/input_buttons.cpp
-		src/platform/psvita/ui.cpp
-		src/platform/psvita/ui.h)
-elseif(PLAYER_TARGET_PLATFORM STREQUAL "switch")
-	target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_UI=NxUi PLAYER_NINTENDO)
-	find_package(OpenGL CONFIG REQUIRED)
-	find_library(GLAD glad REQUIRED)
-	target_link_libraries(${PROJECT_NAME} OpenGL::EGL)
-	# generate gfx assets
-	enable_language(ASM)
-	dkp_add_embedded_binary_library(switch-assets "${CMAKE_CURRENT_SOURCE_DIR}/resources/switch/touch_ui.png")
-	target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-	target_sources(${PROJECT_NAME} INTERFACE
-		$<TARGET_OBJECTS:switch-assets> PRIVATE
-		src/platform/switch/audio.cpp
-		src/platform/switch/audio.h
-		src/platform/switch/clock.h
-		src/platform/switch/input_buttons.cpp
-		src/platform/switch/ui.cpp
-		src/platform/switch/ui.h)
-	target_link_libraries(${PROJECT_NAME} switch-assets)
-else()
-	message(FATAL_ERROR "Invalid target platform")
 endif()
 
 # Sound system to use
@@ -805,97 +671,12 @@ if(NOT PLAYER_AUDIO_BACKEND IN_LIST AUDIO_PROP)
 	message(FATAL_ERROR "Incompatible audio backend configuration ${PLAYER_AUDIO_BACKEND}.\nPlease clear the CMake cache.\nOptions: ${AUDIO_PROP}")
 endif()
 
-# Shared by homebrew platforms
-if(NINTENDO_3DS OR NINTENDO_WII OR NINTENDO_WIIU OR NINTENDO_WIIU OR NINTENDO_SWITCH OR VITA)
-	target_compile_options(${PROJECT_NAME} PUBLIC -fno-exceptions -fno-rtti)
-	if(VITA)
-		# This optimisation is unstable on Vita (crashes at the end of MainLoop)
-		target_compile_options(${PROJECT_NAME} PUBLIC -fno-optimize-sibling-calls)
-	endif()
-	set(CMAKE_DL_LIBS "") # hack4icu!
-	set(PLAYER_ENABLE_TESTS OFF)
-	option(PLAYER_VERSIONED_PACKAGES "Create zip packages with versioned name (for internal use)" ON)
-	set(PLAYER_CONSOLE_PORT ON)
-else()
-	set(PLAYER_CONSOLE_PORT OFF)
-endif()
-# Make content available (romfs/wuhb bundle)
-if(NINTENDO_3DS OR NINTENDO_WIIU OR NINTENDO_SWITCH)
-	option(PLAYER_BUNDLE "Embed a directory in the executable" OFF)
-	set(PLAYER_BUNDLE_PATH "content" CACHE PATH "Directory to include in executable")
-	set(BUNDLE_ARG "_IGNORE_ME")
-	if(PLAYER_BUNDLE)
-		if(NINTENDO_WIIU)
-			set(BUNDLE_ARG "CONTENT")
-		else()
-			set(BUNDLE_ARG "ROMFS")
-		endif()
-	endif()
-endif()
-
-# Amiga
-if(AMIGA)
-	target_compile_options(${PROJECT_NAME} PUBLIC -fno-exceptions -fno-rtti)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC PLAYER_AMIGA)
-	if(MORPHOS)
-		target_compile_definitions(${PROJECT_NAME} PUBLIC
-			_GLIBCXX_USE_C99 _NO_PPCINLINE __MORPHOS_SHAREDLIBS)
-		# -noixemul handled as "M68K_CRT" in toolchain file
-		target_sources(${PROJECT_NAME} PRIVATE
-			src/platform/morphos/integration.cpp)
-		set_property(SOURCE src/platform/morphos/integration.cpp
-			PROPERTY COMPILE_DEFINITIONS PLAYER_VERSION="${PLAYER_VERSION_FULL}"
-		)
-	endif()
-	if(AMIGAOS4)
-		# FIXME: needed?
-		target_compile_definitions(${PROJECT_NAME} PUBLIC
-			_GLIBCXX_USE_C99_STDINT_TR1 _GLIBCXX_USE_C99_STDIO)
-		target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
-			${CMAKE_CURRENT_SOURCE_DIR}/src/platform/amigaos4)
-	endif()
-	if(AROS)
-		message(WARNING "AROS is unsupported currently. Patches welcome!")
-	endif()
-endif()
-
 if(NOT PLAYER_BUILD_EXECUTABLE AND BUILD_SHARED_LIBS)
 	# Need fPIC when compiling a shared library (e.g. libretro.so)
 	include(CheckPIESupported)
 	check_pie_supported()
 	set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 	set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE TRUE)
-endif()
-
-if(ANDROID)
-	target_link_libraries(${PROJECT_NAME} android log)
-endif()
-
-if(WIN32)
-	target_sources(${PROJECT_NAME} PRIVATE
-		src/registry.cpp
-		src/platform/windows/utils.cpp
-		src/platform/windows/utils.h
-		src/platform/windows/midiout_device_win32.cpp
-		src/platform/windows/midiout_device_win32.h)
-endif()
-
-if(APPLE)
-	enable_language(OBJCXX)
-	target_sources(${PROJECT_NAME} PRIVATE
-		src/platform/macos/macos_utils.mm
-		src/platform/macos/macos_utils.h)
-
-	if(MACOS)
-		find_Library(MACOSAUDIOUNIT AudioUnit REQUIRED)
-		target_sources(${PROJECT_NAME} PRIVATE
-			src/platform/macos/midiout_device_coreaudio.cpp
-			src/platform/macos/midiout_device_coreaudio.h)
-	endif()
-
-	find_library(MACOSFOUNDATION Foundation REQUIRED)
-	find_library(MACOSAUDIOTOOLBOX AudioToolbox REQUIRED)
-	target_link_libraries(${PROJECT_NAME} ${MACOSFOUNDATION} ${MACOSAUDIOUNIT} ${MACOSAUDIOTOOLBOX})
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
@@ -1204,41 +985,13 @@ endif()
 
 # Executable
 if(PLAYER_BUILD_EXECUTABLE AND ${PLAYER_TARGET_PLATFORM} MATCHES "^SDL.*$" AND NOT PLAYER_CONSOLE_PORT)
-	if(APPLE)
-		set(EXE_NAME "EasyRPG-Player.app")
-		set_source_files_properties(${${PROJECT_NAME}_BUNDLE_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-		add_executable(${EXE_NAME} MACOSX_BUNDLE "src/platform/sdl/main.cpp" ${${PROJECT_NAME}_BUNDLE_ICON})
-		configure_file(resources/macos/Info.plist.in resources/macos/Info.plist @ONLY)
-		set_target_properties(${EXE_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/resources/macos/Info.plist")
-		set_target_properties(${EXE_NAME} PROPERTIES OUTPUT_NAME "EasyRPG Player")
-	else()
-		set(EXE_NAME ${PROJECT_NAME}_exe)
+	set(EXE_NAME ${PROJECT_NAME}_exe)
 		if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 			add_executable(${EXE_NAME} "src/platform/emscripten/main.cpp")
 		else()
 			add_executable(${EXE_NAME} "src/platform/sdl/main.cpp")
 		endif()
 		set_target_properties(${EXE_NAME} PROPERTIES OUTPUT_NAME "easyrpg-player")
-	endif()
-
-	if(WIN32)
-		# Open console for Debug builds
-		set_target_properties(${EXE_NAME} PROPERTIES WIN32_EXECUTABLE $<$<NOT:$<CONFIG:Debug>>:TRUE>)
-
-		# Add resources
-		string(REPLACE "." "," RC_VERSION ${PROJECT_VERSION})
-		string(TIMESTAMP RC_YEAR "%Y")
-		configure_file(resources/windows/player.rc.in resources/windows/player.rc @ONLY)
-		target_sources(${EXE_NAME} PRIVATE
-			resources/windows/player.manifest
-			"${CMAKE_CURRENT_BINARY_DIR}/resources/windows/player.rc")
-
-		# Set Visual Studio startup project
-		set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${EXE_NAME})
-
-		# Change executable name
-		set_target_properties(${EXE_NAME} PROPERTIES OUTPUT_NAME "Player")
-	endif()
 
 	target_link_libraries(${EXE_NAME} ${PROJECT_NAME})
 
@@ -1277,195 +1030,12 @@ if(PLAYER_BUILD_EXECUTABLE AND ${PLAYER_TARGET_PLATFORM} MATCHES "^SDL.*$" AND N
 		set_target_properties(${EXE_NAME} PROPERTIES OUTPUT_NAME "${PLAYER_JS_OUTPUT_NAME}")
 	endif()
 
-	# installation
-	include(GNUInstallDirs)
-	if(APPLE)
-		install(TARGETS ${EXE_NAME} RUNTIME DESTINATION BUNDLE DESTINATION "${CMAKE_BINARY_DIR}/Package")
-	else()
-		install(TARGETS ${EXE_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-	endif()
-
-	if(UNIX)
-		# Install desktop entry, icons and metainfo
-		install(FILES resources/unix/easyrpg-player.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-		install(FILES resources/unix/icon-48.png RENAME easyrpg-player.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps) # legacy
-		install(FILES resources/unix/icon-48.png RENAME easyrpg-player.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/48x48/apps)
-		install(FILES resources/unix/easyrpg-player.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
-		install(FILES resources/unix/easyrpg-player.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
-	endif()
-
-	if(MSVC)
-		install(FILES $<TARGET_PDB_FILE:${EXE_NAME}> DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
-	endif()
-
 	if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 		# Emscripten does not install the wasm file (or the js file when building a shell)
 		if(PLAYER_JS_BUILD_SHELL)
 			install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PLAYER_JS_OUTPUT_NAME}.js DESTINATION ${CMAKE_INSTALL_BINDIR})
 		endif()
 		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PLAYER_JS_OUTPUT_NAME}.wasm DESTINATION ${CMAKE_INSTALL_BINDIR})
-	endif()
-elseif(PLAYER_CONSOLE_PORT AND NOT PLAYER_TARGET_PLATFORM STREQUAL "libretro")
-	set(CPACK_PLATFORM "${PLAYER_TARGET_PLATFORM}")
-	if(NINTENDO_3DS)
-		add_executable(easyrpg-player src/platform/3ds/main.cpp)
-		target_link_libraries(easyrpg-player
-			${PROJECT_NAME}
-			-lcitro2d
-			-lcitro3d)
-		ctr_generate_smdh(easyrpg-player.smdh
-			NAME "EasyRPG Player ${PLAYER_VERSION_FULL}"
-			DESCRIPTION "Play your RPG Maker 2000/2003 games everywhere"
-			AUTHOR "EasyRPG Team"
-			ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/3ds/icon.png)
-		ctr_create_3dsx(easyrpg-player
-			SMDH easyrpg-player.smdh
-			${BUNDLE_ARG} ${PLAYER_BUNDLE_PATH})
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.3dsx
-			DESTINATION easyrpg-player COMPONENT 3ds)
-	elseif(NINTENDO_SWITCH)
-		add_executable(easyrpg-player src/platform/switch/main.cpp)
-		target_link_libraries(easyrpg-player
-			${PROJECT_NAME}
-			${GLAD})
-		nx_generate_nacp(easyrpg-player.nacp
-			NAME "EasyRPG Player"
-			AUTHOR "EasyRPG Team"
-			VERSION "${PLAYER_VERSION_FULL}")
-		nx_create_nro(easyrpg-player
-			NACP easyrpg-player.nacp
-			ICON "${PROJECT_SOURCE_DIR}/resources/switch/icon.jpg"
-			${BUNDLE_ARG} ${PLAYER_BUNDLE_PATH})
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.nro
-			DESTINATION easyrpg-player COMPONENT switch)
-	elseif(NINTENDO_WII)
-		add_executable(easyrpg-player src/platform/wii/main.cpp)
-		target_link_libraries(easyrpg-player
-			${PROJECT_NAME}
-			${SDL_LIBRARIES}
-			-laesnd
-			-lfat
-			-lwiikeyboard)
-		if(TARGET SDL2::SDL2main)
-			# Missing dependency?
-			target_link_libraries(SDL2::SDL2main INTERFACE -lfat)
-		endif()
-		ogc_create_dol(easyrpg-player)
-		string(TIMESTAMP WII_DATE "%Y%m%d000000")
-		configure_file(resources/wii/meta.xml.in resources/wii/meta.xml @ONLY)
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.dol
-			RENAME boot.dol
-			DESTINATION easyrpg-player COMPONENT wii)
-		install(FILES resources/wii/icon.png
-			${CMAKE_CURRENT_BINARY_DIR}/resources/wii/meta.xml
-			DESTINATION easyrpg-player COMPONENT wii)
-	elseif(NINTENDO_WIIU)
-		add_executable(easyrpg-player src/platform/wiiu/main.cpp)
-		target_link_libraries(easyrpg-player ${PROJECT_NAME})
-		wut_create_rpx(easyrpg-player)
-		wut_create_wuhb(easyrpg-player
-			NAME "EasyRPG Player ${PLAYER_VERSION_FULL}"
-			SHORTNAME "EasyRPG Player"
-			AUTHOR "EasyRPG Team"
-			ICON resources/wiiu/icon.png
-			TVSPLASH resources/wiiu/splash-tv.png
-			DRCSPLASH resources/wiiu/splash-drc.png
-			${BUNDLE_ARG} ${PLAYER_BUNDLE_PATH})
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.rpx
-				${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.wuhb
-			DESTINATION . COMPONENT wiiu)
-		set(CPACK_PLATFORM "wiiu")
-	elseif(VITA)
-		set(CMAKE_EXECUTABLE_SUFFIX .elf)
-		add_executable(easyrpg-player src/platform/psvita/main.cpp)
-		target_link_libraries(easyrpg-player
-			${PROJECT_NAME}
-			vita2d
-			-Wl,--whole-archive pthread -Wl,--no-whole-archive
-			SceLibKernel_stub
-			SceDisplay_stub
-			SceGxm_stub
-			SceSysmodule_stub
-			SceCtrl_stub
-			SceTouch_stub
-			ScePgf_stub
-			ScePower_stub
-			SceCommonDialog_stub
-			SceAudio_stub
-			SceAppMgr_stub)
-		vita_create_self(eboot.bin easyrpg-player.elf $<$<NOT:$<CONFIG:Debug>>:STRIPPED>)
-		set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
-		configure_file(resources/psvita/template.xml.in resources/psvita/template.xml @ONLY)
-		vita_create_vpk(EasyRPG-Player.vpk "EASYRPG01" eboot.bin
-			VERSION "${PROJECT_VERSION_MAJOR}${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${PROJECT_VERSION_TWEAK}"
-			NAME "EasyRPG Player"
-			FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/psvita/icon0.png" sce_sys/icon0.png
-			FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/psvita/bg.png" sce_sys/livearea/contents/bg.png
-			FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/psvita/startup.png" sce_sys/livearea/contents/startup.png
-			FILE "${CMAKE_CURRENT_BINARY_DIR}/resources/psvita/template.xml" sce_sys/livearea/contents/template.xml
-			FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/psvita/touch_ui.png" touch_ui.png)
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EasyRPG-Player.vpk
-			DESTINATION . COMPONENT psvita)
-	endif()
-	install(TARGETS easyrpg-player RUNTIME DESTINATION . COMPONENT debug)
-	# debug information
-	if(NINTENDO_3DS OR NINTENDO_WII OR NINTENDO_WIIU OR NINTENDO_SWITCH)
-		dkp_target_generate_symbol_list(easyrpg-player)
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.map
-				${CMAKE_CURRENT_BINARY_DIR}/easyrpg-player.lst
-			DESTINATION . COMPONENT debug)
-	endif()
-	# packaging for distribution
-	set(CPACK_GENERATOR "ZIP")
-	set(CPACK_SOURCE_GENERATOR ";") # disable source archive
-	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON) # split archives
-	set(CPACK_PACKAGE_FILE_NAME "easyrpg-player")
-	if(PLAYER_VERSIONED_PACKAGES)
-		string(APPEND CPACK_PACKAGE_FILE_NAME "-${PLAYER_VERSION}")
-	endif()
-	set(CPACK_ARCHIVE_DEBUG_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}-${CPACK_PLATFORM}-debug")
-	set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF) # we do this manually
-	include(CPack)
-else() # library
-	if(PLAYER_TARGET_PLATFORM STREQUAL "libretro")
-		add_library(easyrpg_libretro
-			src/platform/libretro/audio.cpp
-			src/platform/libretro/audio.h
-			src/platform/libretro/clock.cpp
-			src/platform/libretro/clock.h
-			src/platform/libretro/input_buttons.cpp
-			src/platform/libretro/ui.cpp
-			src/platform/libretro/ui.h
-			src/platform/libretro/midiout_device.cpp
-			src/platform/libretro/midiout_device.h
-		)
-		set_property(SOURCE src/platform/libretro/ui.cpp
-			PROPERTY COMPILE_DEFINITIONS PLAYER_VERSION_FULL="${PLAYER_VERSION_FULL}"
-		)
-		target_link_libraries(easyrpg_libretro ${PROJECT_NAME})
-		set_target_properties(easyrpg_libretro PROPERTIES PREFIX "")
-		set(PLAYER_TEST_LIBRARIES "easyrpg_libretro")
-
-		if(WIN32)
-			set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT easyrpg_libretro)
-		endif()
-	elseif(ANDROID AND ${PLAYER_TARGET_PLATFORM} MATCHES "^SDL.*$")
-		add_library(easyrpg_android
-			src/platform/android/android.cpp
-			src/platform/android/android.h
-			src/platform/android/org_easyrpg_player_player_EasyRpgPlayerActivity.cpp
-			src/platform/android/org_easyrpg_player_player_EasyRpgPlayerActivity.h
-			src/platform/android/filesystem_apk.cpp
-			src/platform/android/filesystem_apk.h
-			src/platform/android/filesystem_saf.cpp
-			src/platform/android/filesystem_saf.h
-			src/platform/sdl/main.cpp)
-		target_link_libraries(easyrpg_android ${PROJECT_NAME})
-		set_target_properties(easyrpg_android PROPERTIES DEBUG_POSTFIX "")
-		add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/builds/android/app/src/gamebrowser)
-		set(PLAYER_TEST_LIBRARIES "easyrpg_android")
-	else()
-		message(FATAL_ERROR "Unsupported library target platform ${PLAYER_TARGET_PLATFORM}")
 	endif()
 endif()
 
@@ -1538,39 +1108,6 @@ if(DOXYGEN_FOUND)
 	add_dependencies(doc player_doc)
 endif()
 
-# Unit tests
-option(PLAYER_ENABLE_TESTS "Execute unit tests after compilation finishes" ON)
-
-if(PLAYER_ENABLE_TESTS)
-	file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
-	add_executable(test_runner_player EXCLUDE_FROM_ALL ${TEST_FILES})
-	set_target_properties(test_runner_player PROPERTIES
-		OUTPUT_NAME "test_runner"
-		WIN32_EXECUTABLE FALSE
-	)
-
-	if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-		target_compile_definitions(test_runner_player PUBLIC EP_NATIVE_TEST_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/assets\")
-		target_compile_definitions(test_runner_player PUBLIC EP_TEST_PATH=\"/assets\")
-		target_compile_definitions(test_runner_player PUBLIC DOCTEST_CONFIG_NO_EXCEPTIONS_BUT_WITH_ALL_ASSERTS=1)
-
-		target_link_libraries(test_runner_player "nodefs.js")
-		set_property(TARGET test_runner_player PROPERTY LINK_FLAGS "-sALLOW_MEMORY_GROWTH --bind")
-	else()
-		target_compile_definitions(test_runner_player PUBLIC EP_TEST_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/assets\")
-	endif()
-	target_link_libraries(test_runner_player ${PLAYER_TEST_LIBRARIES})
-	if(CMAKE_COLOR_DIAGNOSTICS)
-		set(DOCTEST_COLOROPT "--force-colors")
-	endif()
-	add_custom_target(check_player COMMAND test_runner_player ${DOCTEST_COLOROPT})
-	if(NOT TARGET check)
-		add_custom_target(check)
-	endif()
-	add_dependencies(check_player test_runner_player)
-	add_dependencies(check check_player)
-endif()
-
 # Instrumentation framework
 set(PLAYER_ENABLE_INSTRUMENTATION "OFF" CACHE STRING "Build performance instrumentation hooks")
 set_property(CACHE PLAYER_ENABLE_INSTRUMENTATION PROPERTY STRINGS OFF VTune)
@@ -1579,29 +1116,6 @@ if (NOT ${PLAYER_ENABLE_INSTRUMENTATION} STREQUAL "OFF")
 	if (${PLAYER_ENABLE_INSTRUMENTATION} STREQUAL "VTune")
 		player_find_package(NAME VTune TARGET VTune::ITT REQUIRED)
 	endif()
-endif()
-
-# Benchmarks
-option(PLAYER_ENABLE_BENCHMARKS "Build benchmarks" OFF)
-
-if(PLAYER_ENABLE_BENCHMARKS)
-	find_package(benchmark REQUIRED)
-	file(GLOB BENCH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/bench/*.cpp)
-	foreach(i ${BENCH_FILES})
-		get_filename_component(name "${i}" NAME_WE)
-		add_executable(bench_${name} ${i})
-		set_target_properties(bench_${name} PROPERTIES WIN32_EXECUTABLE FALSE)
-		target_link_libraries(bench_${name} ${PROJECT_NAME})
-		target_link_libraries(bench_${name} benchmark)
-		if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-			target_link_libraries(bench_${name} "websocket.js")
-			set_property(TARGET bench_${name} PROPERTY LINK_FLAGS
-				"-sALLOW_MEMORY_GROWTH -sMODULARIZE \
-				 -sEXIT_RUNTIME --bind \
-				 -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=['$autoResumeAudioContext','$dynCall'] \
-				 -sEXPORTED_FUNCTIONS=_main,_malloc,_free")
-		endif()
-	endforeach()
 endif()
 
 # Print summary

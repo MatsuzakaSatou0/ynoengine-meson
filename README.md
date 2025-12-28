@@ -7,6 +7,24 @@ Builds for the emscripten target only.
 
 Server: https://github.com/ynoproject/ynoserver
 
+# Before the build
+Before building, please modify the absolute path of emscripten in emscripten_cross.txt to match your environment.
+```
+git clone https://github.com/emscripten-core/emsdk
+
+emsdk/emsdk.bat install latest
+
+emsdk/emsdk.bat activate latest --permanent
+```
+```
+conan install . --output-folder=build --build='pixman/0.42.2' -s os=Emscripten -s arch=wasm -s compiler=clang -s compiler.version=16 -s compiler.libcxx=libc++ -s compiler=clang  -c "tools.meson.mesontoolchain:extra_machine_files=['D:\Jenkins\ynoengine-meson\ynoengine-meson\emscripten_cross.txt']"
+
+$env:PKG_CONFIG_PATH = "$(Get-Location)\build"
+
+meson setup builddir --cross-file .\emscripten_cross.txt
+
+meson compile -C builddir
+```
 ## Documentation
 
 Documentation is available at the documentation wiki: https://wiki.easyrpg.org

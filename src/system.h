@@ -26,10 +26,6 @@
 #  include <config.h>
 #endif
 
-#if !(defined(USE_SDL) || defined(PLAYER_UI))
-#  error "This build doesn't target a backend"
-#endif
-
 /*
  * TODO?: Combine system.h and options.h ?
  * options.h is oriented to configurations that the EasyRPG user might want

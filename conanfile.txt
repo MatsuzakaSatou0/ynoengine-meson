@@ -1,0 +1,10 @@
+[requires]
+liblzf/3.6
+libpng/1.6.53
+libdeflate/1.25
+fmt/12.1.0
+nlohmann_json/3.12.0
+pixman/0.42.2
+[generators]
+PkgConfigDeps
+MesonToolchain

@@ -1,0 +1,17 @@
+[binaries]
+c = ['python','D:/Jenkins/ynoengine-meson/ynoengine-meson/emsdk/upstream/emscripten/emcc.py']
+cpp = ['python','D:/Jenkins/ynoengine-meson/ynoengine-meson/emsdk/upstream/emscripten/em++.py']
+ar = ['python','D:/Jenkins/ynoengine-meson/ynoengine-meson/emsdk/upstream/emscripten/emar.py']
+nm = ['python','D:/Jenkins/ynoengine-meson/ynoengine-meson/emsdk/upstream/emscripten/emnm.py']
+strip = ['python','D:/Jenkins/ynoengine-meson/ynoengine-meson/emsdk/upstream/emscripten/emstrip.py']
+pkg-config = ['pkg-config.exe']
+cmake = ['cmake.exe']
+
+[host_machine]
+system = 'wasm'
+cpu_family = 'wasm'
+cpu = 'wasm'
+endian = 'little'
+
+[properties]
+skip_sanity_check = true

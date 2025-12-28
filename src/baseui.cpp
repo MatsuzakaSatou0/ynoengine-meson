@@ -48,7 +48,7 @@ std::shared_ptr<BaseUi> BaseUi::CreateUi(long width, long height, const Game_Con
 #elif defined(PLAYER_UI)
 	return std::make_shared<PLAYER_UI>(width, height, cfg);
 #else
-#  error cannot create UI
+	
 #endif
 }
 
