@@ -9,7 +9,7 @@ libdeflate = dependency('libdeflate', cmake_module_path : 'cmake')
 nlohmann = dependency('nlohmann_json', cmake_module_path : 'cmake')
 pixman = dependency('pixman-1', cmake_module_path : 'cmake')
 
-my_lib = static_library('EasyRPG_Player',
+executable('EasyRPG_Player',
                         'src/lcf/context.h',
                         'src/lcf/dbarray.h',
                         'src/lcf/dbarrayalloc.h',
@@ -577,7 +577,3 @@ my_lib = static_library('EasyRPG_Player',
                         include_directories: inc_dir,
                         dependencies:[liblzf,libpng,fmt,libdeflate,nlohmann,pixman]
 )
-
-sdl3_flags = ['-s', 'USE_SDL=3']
-executable('EasyRPG_Player', 
-           link_with : my_lib,)
